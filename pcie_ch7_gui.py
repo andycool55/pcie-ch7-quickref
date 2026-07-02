@@ -266,7 +266,7 @@ def run():
     _open_page = [673]
     _history = []           # navigation stack (excluding current)
     _current = [None]       # ("welcome",) | ("section", id) | ("cap", id) | ("reg", name) | ("search", q)
-    _suppress_sel = [False] # avoid recursion when programmatically selecting tree items
+    # (was: _suppress_sel — replaced by _prog_toc/_prog_cap/_prog_reg markers)
     
     # ── helper functions ──────────────────────────────────────────────────────
     def clear_content():
@@ -978,45 +978,55 @@ def run():
     def _set_crumb(text):
         crumb_var.set(text)
 
+    # ── programmatic selection guards ────────────────────────────────────────
+    # We remember the *last selection we set ourselves*. When TreeviewSelect
+    # fires, the handler compares against this and short-circuits if it's
+    # our own selection. try/finally suppression doesn't work because Tk
+    # dispatches <<TreeviewSelect>> asynchronously — the flag is already
+    # reset by the time the handler runs.
+    _prog_toc = [None]   # sec last set programmatically
+    _prog_cap = [None]
+    _prog_reg = [None]
+
     def _select_toc(sec):
-        """Programmatically select `sec` in the TOC tree without recursion."""
-        if not sec or sec not in toc_tree.get_children("") and \
-                not toc_tree.exists(sec):
+        if not sec or not toc_tree.exists(sec):
             return
-        _suppress_sel[0] = True
-        try:
-            # expand ancestors
-            parts = sec.split(".")
-            for i in range(2, len(parts)):
-                anc = ".".join(parts[:i])
-                if toc_tree.exists(anc):
-                    toc_tree.item(anc, open=True)
-            if toc_tree.exists(sec):
-                toc_tree.selection_set(sec)
-                toc_tree.see(sec)
-                nb.select(tab_toc)
-        finally:
-            _suppress_sel[0] = False
+        # expand ancestors first
+        parts = sec.split(".")
+        for i in range(2, len(parts)):
+            anc = ".".join(parts[:i])
+            if toc_tree.exists(anc):
+                toc_tree.item(anc, open=True)
+        # only touch selection if different — avoids gratuitous events
+        cur = toc_tree.selection()
+        if cur and cur[0] == sec:
+            toc_tree.see(sec)
+            return
+        _prog_toc[0] = sec
+        toc_tree.selection_set(sec)
+        toc_tree.see(sec)
 
     def _select_cap(cap_id):
-        if cap_tree.exists(cap_id):
-            _suppress_sel[0] = True
-            try:
-                cap_tree.selection_set(cap_id)
-                cap_tree.see(cap_id)
-                nb.select(tab_cap)
-            finally:
-                _suppress_sel[0] = False
+        if not cap_tree.exists(cap_id):
+            return
+        cur = cap_tree.selection()
+        if cur and cur[0] == cap_id:
+            cap_tree.see(cap_id)
+            return
+        _prog_cap[0] = cap_id
+        cap_tree.selection_set(cap_id)
+        cap_tree.see(cap_id)
 
     def _select_reg(reg_name):
-        if reg_tree.exists(reg_name):
-            _suppress_sel[0] = True
-            try:
-                reg_tree.selection_set(reg_name)
-                reg_tree.see(reg_name)
-                nb.select(tab_reg)
-            finally:
-                _suppress_sel[0] = False
+        if not reg_tree.exists(reg_name):
+            return
+        cur = reg_tree.selection()
+        if cur and cur[0] == reg_name:
+            reg_tree.see(reg_name)
+            return
+        _prog_reg[0] = reg_name
+        reg_tree.selection_set(reg_name)
+        reg_tree.see(reg_name)
 
     def show_welcome(record=True):
         if record:
@@ -1244,26 +1254,37 @@ def run():
         lambda *_: _debounce_filter("reg", _populate_reg, reg_filter_var))
 
     # ── tree selection → show ────────────────────────────────────────────────
+    # Handlers ignore selections we made ourselves (via _select_*), otherwise
+    # every programmatic sync would loop back into show_* infinitely.
     def _on_toc_select(_e):
-        if _suppress_sel[0]:
-            return
         sel = toc_tree.selection()
-        if sel:
-            show_section(sel[0])
+        if not sel:
+            return
+        sec = sel[0]
+        if _prog_toc[0] == sec:
+            _prog_toc[0] = None       # consume the marker
+            return
+        show_section(sec)
 
     def _on_cap_select(_e):
-        if _suppress_sel[0]:
-            return
         sel = cap_tree.selection()
-        if sel:
-            show_capability(sel[0])
+        if not sel:
+            return
+        cid = sel[0]
+        if _prog_cap[0] == cid:
+            _prog_cap[0] = None
+            return
+        show_capability(cid)
 
     def _on_reg_select(_e):
-        if _suppress_sel[0]:
-            return
         sel = reg_tree.selection()
-        if sel:
-            show_register(sel[0])
+        if not sel:
+            return
+        rn = sel[0]
+        if _prog_reg[0] == rn:
+            _prog_reg[0] = None
+            return
+        show_register(rn)
 
     toc_tree.bind("<<TreeviewSelect>>", _on_toc_select)
     cap_tree.bind("<<TreeviewSelect>>", _on_cap_select)
