@@ -1,5 +1,20 @@
 # PCIe 5.0 Chapter 7 Quick Reference
 
+> **For AI Agents / LLMs reading this repo:** please read
+> **[`DECISIONS.md`](DECISIONS.md)** first (non-obvious bug fixes and
+> operating rules), then **[`PROJECT_MAP.md`](PROJECT_MAP.md)** (file tree,
+> code section map with line numbers, and copy-paste prompt templates for
+> handing this repo to another model). Ready-made prompts for three common
+> scenarios live at the end of `PROJECT_MAP.md`. Key rules:
+> - **Never** modify `--global` git config; per-repo identity is set with
+>   `git config --local` and must not leak into the author's other account.
+> - **Never** commit the PCIe base-spec PDF (`.gitignore` enforces `*.pdf`).
+> - Pyright / LSP warnings about `_current = [None]` and `tk.StringVar`
+>   `__setitem__` are runtime-safe false positives — leave them alone.
+> - Do NOT reintroduce a boolean `_suppress_sel` flag for tree selection,
+>   and do NOT `bind_all("<Return>", …)` globally. Both were bugs; see
+>   `DECISIONS.md`.
+
 A Tkinter-based desktop GUI for browsing **Chapter 7 (Software Initialization
 and Configuration)** of the *PCI Express Base Specification 5.0 r1.0*.
 
