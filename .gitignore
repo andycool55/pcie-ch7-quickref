@@ -1,0 +1,42 @@
+# ── PCIe Base Specification PDF (copyright – users must supply their own) ──
+NCB-PCI_Express_Base_*.pdf
+*.pdf
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ── Distribution / build ─────────────────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# ── Virtual envs ─────────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── IDE / editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Test / coverage ──────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ── Logs / misc runtime ──────────────────────────────────────────────────────
+*.log
