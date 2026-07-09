@@ -113,6 +113,22 @@ into the actual spec page.
 per-page deep-linking; otherwise the PDF opens at page 1 with your default
 reader.
 
+### 1.1 Quickly switch to a newer PCIe spec (6.0/7.0...)
+
+This project now supports version switching via one config file:
+
+- Use the top-bar profile dropdown to switch spec immediately in UI.
+- To add future versions, edit `pcie_spec_config.py` and add a profile in
+  `SPEC_PROFILES`.
+- Full step-by-step: `SPEC_UPGRADE_GUIDE.md`.
+
+Temporary override via environment variable:
+
+```powershell
+$env:PCIE_SPEC_PDF = "D:\Path\To\NCB-PCI_Express_Base_6.0r1.0-YYYY-MM-DD.pdf"
+python run_gui.py
+```
+
 ### 2. Clone & run
 
 ```powershell

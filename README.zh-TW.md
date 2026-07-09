@@ -99,6 +99,22 @@ NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf
 *(可選)* 安裝 [SumatraPDF](https://www.sumatrapdfreader.org/) 就能精準
 跳頁；沒裝的話會用你的系統預設 PDF 閱讀器打開第 1 頁。
 
+### 1.1 快速切換 PCIe 新版規格（6.0/7.0...）
+
+本專案已支援用單一設定檔切換規格版本：
+
+- 可直接在 UI 頂部的 profile 下拉選單即時切換規格。
+- 若要新增未來版本，編輯 `pcie_spec_config.py`，在 `SPEC_PROFILES`
+  增加新 profile。
+- 詳細步驟請看 `SPEC_UPGRADE_GUIDE.md`。
+
+也可暫時用環境變數指定 PDF：
+
+```powershell
+$env:PCIE_SPEC_PDF = "D:\Path\To\NCB-PCI_Express_Base_6.0r1.0-YYYY-MM-DD.pdf"
+python run_gui.py
+```
+
 ### 2. Clone 與執行
 
 ```powershell

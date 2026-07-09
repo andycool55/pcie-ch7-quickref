@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# PCIe 5.0 Ch.7 Quick Reference -- STANDALONE, double-click to run
-# Source: NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf
+# PCIe Ch.7 Quick Reference -- STANDALONE, double-click to run
+# Source PDF: configured in pcie_spec_config.py
 
 import traceback, sys, os
 

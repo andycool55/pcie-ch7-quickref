@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PCIe 5.0 Ch.7 Query Tool  — GUI (Python 3.14 safe, composition pattern)
+PCIe Ch.7 Query Tool  — GUI (Python 3.14 safe, composition pattern)
 右側直接以結構化表格顯示暫存器 bit fields / 章節資訊
 """
 
@@ -14,9 +14,12 @@ from pcie_ch7_tool import (
     CHAPTER7_TOC, CAPABILITY_ID_MAP, REGISTER_ATTRIBUTES,
     REGISTER_DB, search_toc, search_keywords, fuzzy_search,
 )
-
-PDF_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf")
+from pcie_spec_config import (
+    get_profile,
+    list_profiles,
+    current_pdf_name,
+    resolve_pdf_path,
+)
 
 # ── palette ───────────────────────────────────────────────────────────────────
 BG       = "#1c2133"
@@ -58,8 +61,18 @@ def attr_color(attr_str):
 # ═════════════════════════════════════════════════════════════════════════════
 def run():
     print("DEBUG: Starting run() function")
+    profiles = list_profiles()
+    profile_map = {p.label: p for p in profiles}
+    _spec = [get_profile(None)]
+
+    def spec():
+        return _spec[0]
+
+    def to_spec_page(dataset_page):
+        return dataset_page + getattr(spec(), "page_offset", 0)
+
     root = tk.Tk()
-    root.title("PCIe 5.0 — Chapter 7 Quick Reference")
+    root.title(f"{spec().name} — Chapter {spec().chapter} Quick Reference")
     root.geometry("1440x900")
     root.minsize(1000, 650)
     root.configure(bg=BG)
@@ -91,10 +104,20 @@ def run():
     topbar.pack(fill="x")
     topbar.pack_propagate(False)
 
-    tk.Label(topbar, text="⚡ PCIe 5.0  Ch.7", bg=HDR, fg=ACCENT,
+    top_title_var = tk.StringVar()
+    top_subtitle_var = tk.StringVar()
+
+    tk.Label(topbar, textvariable=top_title_var, bg=HDR, fg=ACCENT,
              font=("Segoe UI", 13, "bold")).pack(side="left", padx=(14, 6), pady=10)
-    tk.Label(topbar, text="Software Initialization & Configuration  ·  pp.673–1000",
+    tk.Label(topbar, textvariable=top_subtitle_var,
              bg=HDR, fg=DIM, font=("Segoe UI", 9)).pack(side="left")
+
+    spec_picker_var = tk.StringVar(value=spec().label)
+    spec_picker = ttk.Combobox(topbar, state="readonly", width=15,
+                               textvariable=spec_picker_var,
+                               values=[p.label for p in profiles],
+                               font=("Segoe UI", 9))
+    spec_picker.pack(side="left", padx=(12, 0), pady=8)
 
     # ── nav buttons (Home / Back) — placed after content funcs are defined ────
     nav_frame = tk.Frame(topbar, bg=HDR)
@@ -263,10 +286,17 @@ def run():
     # ── global state ───────────────────────────────────────────────────────────
     title_var = tk.StringVar()
     page_btn_var = tk.StringVar()
-    _open_page = [673]
+    _open_page = [spec().page_start]
     _history = []           # navigation stack (excluding current)
     _current = [None]       # ("welcome",) | ("section", id) | ("cap", id) | ("reg", name) | ("search", q)
     # (was: _suppress_sel — replaced by _prog_toc/_prog_cap/_prog_reg markers)
+
+    def _refresh_spec_texts():
+        root.title(f"{spec().name} — Chapter {spec().chapter} Quick Reference")
+        top_title_var.set(f"⚡ {spec().name}  Ch.{spec().chapter}")
+        top_subtitle_var.set(f"{spec().chapter_title}  ·  pp.{spec().page_start}-{spec().page_end}")
+
+    _refresh_spec_texts()
     
     # ── helper functions ──────────────────────────────────────────────────────
     def clear_content():
@@ -410,7 +440,7 @@ def run():
                                  wraplength=180, justify="left", cursor="hand2")
             lbl_title.pack(fill="x", padx=8, pady=(2,0))
 
-            lbl_page = tk.Label(card, text=f"p. {info['page']}", bg=PANEL,
+            lbl_page = tk.Label(card, text=f"p. {to_spec_page(info['page'])}", bg=PANEL,
                                 fg=YELLOW, font=("Segoe UI",8), anchor="e",
                                 cursor="hand2")
             lbl_page.pack(fill="x", padx=8, pady=(0,6))
@@ -446,7 +476,7 @@ def run():
                             font=("Segoe UI",9), cursor="hand2", anchor="w")
         lbl_name.pack(side="left", fill="x", expand=True)
 
-        lbl_sec = tk.Label(row, text=f"§{sec}  p.{si.get('page','?')}",
+        lbl_sec = tk.Label(row, text=f"§{sec}  p.{to_spec_page(si.get('page', 1))}",
                            bg=PANEL, fg=YELLOW, font=("Segoe UI",8,"bold"),
                            cursor="hand2")
         lbl_sec.pack(side="right", padx=8)
@@ -463,14 +493,15 @@ def run():
 
     # ── open PDF ──────────────────────────────────────────────────────────────
     def open_pdf(page):
-        if not os.path.exists(PDF_PATH):
-            set_status(f"PDF not found: {PDF_PATH}"); return
+        pdf_path = resolve_pdf_path(spec())
+        if not os.path.exists(pdf_path):
+            set_status(f"PDF not found: {pdf_path}"); return
         try:
             sp = r"C:\Program Files\SumatraPDF\SumatraPDF.exe"
             if os.path.exists(sp):
-                subprocess.Popen([sp, "-page", str(page), PDF_PATH])
+                subprocess.Popen([sp, "-page", str(page), pdf_path])
             else:
-                os.startfile(PDF_PATH)
+                os.startfile(pdf_path)
         except Exception as ex:
             set_status(f"Cannot open: {ex}")
 
@@ -546,7 +577,7 @@ def run():
         meta = tk.Label(header,
                         text=f"offset {reg_data['offset']}  ·  "
                              f"§{reg_data['section']}  ·  "
-                             f"p.{reg_data.get('page','?')}  ·  "
+                             f"p.{to_spec_page(reg_data.get('page', 1))}  ·  "
                              f"{len(reg_data['bits'])} bits",
                         bg=PANEL, fg=DIM,
                         font=("Segoe UI", 9),
@@ -593,17 +624,19 @@ def run():
 
     def _impl_welcome():
         clear_content()
-        title_var.set("PCIe 5.0 — Chapter 7 Quick Reference")
+        title_var.set(f"{spec().name} — Chapter {spec().chapter} Quick Reference")
         page_btn_var.set("")
-        _open_page[0] = 673
+        _open_page[0] = spec().page_start
 
-        section_label(content_frame, "PCIe 5.0 Base Spec — Chapter 7",
+        section_label(content_frame, f"{spec().name} Base Spec — Chapter {spec().chapter}",
                       font=("Segoe UI",15,"bold"), pady=(20,4))
-        section_label(content_frame, "Software Initialization and Configuration",
+        section_label(content_frame, spec().chapter_title,
                       fg=GREEN, font=("Segoe UI",11), pady=(0,8))
         divider(content_frame)
-        info_row(content_frame,"Source:", "NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf")
-        info_row(content_frame,"Coverage:", "pp. 673 – 1000  (328 pages)")
+        info_row(content_frame,"Spec profile:", spec().label)
+        info_row(content_frame,"Source:", current_pdf_name(spec()))
+        info_row(content_frame,"Coverage:",
+                 f"pp. {spec().page_start} - {spec().page_end}  ({spec().coverage_pages_count} pages)")
         info_row(content_frame,"Sections indexed:", str(len(CHAPTER7_TOC)))
         info_row(content_frame,"Cap IDs:", str(len(CAPABILITY_ID_MAP)))
         info_row(content_frame,"Registers with bit details:", str(len(REGISTER_DB)))
@@ -642,14 +675,14 @@ def run():
         info = CHAPTER7_TOC[sec]
         clear_content()
         title_var.set(f"§{sec}  {info['title']}")
-        page_btn_var.set(f"📄 Open PDF  p.{info['page']}")
-        _open_page[0] = info["page"]
+        page_btn_var.set(f"📄 Open PDF  p.{to_spec_page(info['page'])}")
+        _open_page[0] = to_spec_page(info["page"])
 
         section_label(content_frame, f"§{sec}", fg=DIM,
                       font=("Segoe UI",9), pady=(10,0))
         section_label(content_frame, info["title"],
                       font=("Segoe UI",14,"bold"), pady=(0,2))
-        info_row(content_frame,"Spec page:", str(info["page"]), value_fg=YELLOW)
+        info_row(content_frame,"Spec page:", str(to_spec_page(info["page"])), value_fg=YELLOW)
         divider(content_frame)
 
         # child sections as cards
@@ -673,7 +706,7 @@ def run():
                           fg=DIM, font=("Segoe UI",9), pady=(12,4))
 
         canvas.yview_moveto(0)
-        set_status(f"§{sec}: {info['title']}", info["page"])
+        set_status(f"§{sec}: {info['title']}", to_spec_page(info["page"]))
 
     # ─────────────────────────────────────────────────────────────────────────
     def _impl_capability(cap_id):
@@ -684,15 +717,16 @@ def run():
         si   = CHAPTER7_TOC.get(sec, {})
         clear_content()
         title_var.set(f"Capability  {cap_id}  —  {info['name']}")
-        page_btn_var.set(f"📄 Open PDF  p.{si.get('page','?')}")
-        _open_page[0] = si.get("page", 1)
+        _cap_page = si.get("page", 1)
+        page_btn_var.set(f"📄 Open PDF  p.{to_spec_page(_cap_page)}")
+        _open_page[0] = to_spec_page(_cap_page)
 
         section_label(content_frame, f"Capability ID: {cap_id}", fg=CYAN,
                       font=("Consolas",12,"bold"), pady=(14,0))
         section_label(content_frame, info["name"],
                       font=("Segoe UI",13,"bold"), pady=(0,4))
         info_row(content_frame,"Section:", sec)
-        info_row(content_frame,"Spec page:", str(si.get("page","?")), value_fg=YELLOW)
+        info_row(content_frame,"Spec page:", str(to_spec_page(si.get("page", 1))), value_fg=YELLOW)
         divider(content_frame)
 
         # child register sections as cards
@@ -710,7 +744,7 @@ def run():
             _reg_header_bar(content_frame, len(regs), regs, auto_open=(len(regs) == 1))
 
         canvas.yview_moveto(0)
-        set_status(f"Capability {cap_id}: {info['name']}", si.get("page",""))
+        set_status(f"Capability {cap_id}: {info['name']}", to_spec_page(si.get("page", 1)))
 
     # ─────────────────────────────────────────────────────────────────────────
     def _impl_register(reg_name):
@@ -721,14 +755,14 @@ def run():
         si   = CHAPTER7_TOC.get(sec, {})
         clear_content()
         title_var.set(f"{reg_name.replace('_',' ').upper()}  —  §{sec}")
-        page_btn_var.set(f"📄 Open PDF  p.{rd['page']}")
-        _open_page[0] = rd["page"]
+        page_btn_var.set(f"📄 Open PDF  p.{to_spec_page(rd['page'])}")
+        _open_page[0] = to_spec_page(rd["page"])
 
         section_label(content_frame, reg_name.replace("_"," ").upper(),
                       font=("Segoe UI",14,"bold"), pady=(14,2))
         info_row(content_frame,"Section:", f"§{sec}  {si.get('title','')}")
         info_row(content_frame,"Offset:", rd["offset"])
-        info_row(content_frame,"Spec page:", str(rd["page"]), value_fg=YELLOW)
+        info_row(content_frame,"Spec page:", str(to_spec_page(rd["page"])), value_fg=YELLOW)
         divider(content_frame)
 
         section_label(content_frame,"Bit Fields", fg=YELLOW,
@@ -755,7 +789,7 @@ def run():
                      ).pack(side="left")
 
         canvas.yview_moveto(0)
-        set_status(f"Register: {reg_name.replace('_',' ').title()}", rd["page"])
+        set_status(f"Register: {reg_name.replace('_',' ').title()}", to_spec_page(rd["page"]))
 
     # ─────────────────────────────────────────────────────────────────────────
     # ── 搜尋結果卡片牆 ────────────────────────────────────────────────────────
@@ -894,7 +928,7 @@ def run():
             items = []
             for cap_id, info, score in cap_hits:
                 si  = CHAPTER7_TOC.get(info["section"], {})
-                pg  = f"p.{si.get('page','?')}  §{info['section']}"
+                pg  = f"p.{to_spec_page(si.get('page', 1))}  §{info['section']}"
                 def _go(cid=cap_id): show_capability(cid)
                 items.append({
                     "tag":      cap_id,
@@ -928,7 +962,7 @@ def run():
                     "tag_bg":   ACCENT,
                     "title":    info["title"],
                     "sub":      sub,
-                    "page":     f"p.{info['page']}",
+                    "page":     f"p.{to_spec_page(info['page'])}",
                     "on_click": _go,
                 })
             _card_grid(content_frame, items, cols=4)
@@ -943,7 +977,7 @@ def run():
                 display = rn.replace("_", " ").title()
                 si      = CHAPTER7_TOC.get(rd["section"], {})
                 sub     = si.get("title", "")
-                pg      = f"p.{rd['page']}  offset {rd['offset']}"
+                pg      = f"p.{to_spec_page(rd['page'])}  offset {rd['offset']}"
                 def _go(name=rn): show_register(name)
                 items.append({
                     "tag":      rd["offset"],
@@ -1088,6 +1122,36 @@ def run():
             _current[0] = ("search", q)
             _set_crumb(f"🏠  Home  ›  🔍  \"{q}\"")
         _refresh_nav_buttons()
+
+    def _rerender_current_view():
+        cur = _current[0]
+        if cur is None or cur[0] == "welcome":
+            show_welcome(record=False)
+            return
+        kind = cur[0]
+        if kind == "section":
+            show_section(cur[1], record=False)
+        elif kind == "cap":
+            show_capability(cur[1], record=False)
+        elif kind == "reg":
+            show_register(cur[1], record=False)
+        elif kind == "search":
+            sv.set(cur[1])
+            ent.config(fg=TEXT)
+            show_search(cur[1], record=False)
+        else:
+            show_welcome(record=False)
+
+    def _on_spec_profile_change(_e=None):
+        selected = profile_map.get(spec_picker_var.get())
+        if not selected or selected.key == spec().key:
+            return
+        _spec[0] = selected
+        _refresh_spec_texts()
+        _rerender_current_view()
+        set_status(f"Switched spec profile: {selected.label}")
+
+    spec_picker.bind("<<ComboboxSelected>>", _on_spec_profile_change)
 
     def go_back(_e=None):
         if not _history:

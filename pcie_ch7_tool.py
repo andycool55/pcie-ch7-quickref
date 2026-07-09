@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PCIe 5.0 Spec Chapter 7 - Software Initialization and Configuration
+PCIe Spec Chapter 7 - Software Initialization and Configuration
 Interactive Query Tool
 
-Source: NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf
-Chapter 7 (Pages 673-1000)
+Source: project-configured PDF
+Chapter 7 (pages from pcie_spec_config.py)
 """
 
 import json
@@ -21,6 +21,13 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from typing import List, Dict, Optional
+from pcie_spec_config import (
+    get_profile,
+    current_pdf_name,
+    resolve_pdf_path,
+)
+
+ACTIVE_SPEC = get_profile(None)
 
 # ============================================================
 # 第七章結構化資料庫
@@ -2353,9 +2360,9 @@ def format_register_info(reg_name: str, reg_data: dict) -> str:
 # 主要功能
 # ============================================================
 
-def cmd_toc(args: List[str] = None):
+def cmd_toc(args: Optional[List[str]] = None):
     """顯示第七章目錄"""
-    print_header("PCIe 5.0 Chapter 7 - 目錄")
+    print_header(f"{ACTIVE_SPEC.name} Chapter {ACTIVE_SPEC.chapter} - 目錄")
     
     level_filter = None
     if args:
@@ -2425,7 +2432,7 @@ def cmd_section(section_num: str):
         print_header(f"Section {section_num}")
         print(f"\n標題: {info['title']}")
         print(f"頁碼: {info['page']}")
-        print(f"\nPDF 路徑: D:\\WorkData\\PCIe\\PCIe\\NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf")
+        print(f"\nPDF 路徑: {resolve_pdf_path(ACTIVE_SPEC)}")
         
         # 顯示子章節
         children = []
@@ -2587,7 +2594,7 @@ def cmd_list_caps():
 
 def cmd_help():
     """顯示幫助"""
-    print_header("PCIe 5.0 Ch.7 查詢工具 - 說明")
+    print_header(f"{ACTIVE_SPEC.name} Ch.{ACTIVE_SPEC.chapter} 查詢工具 - 說明")
     
     commands = [
         ("toc [level]", "顯示章節目錄 (level=1顯示主章節, 2顯示子章節...)"),
@@ -2622,11 +2629,11 @@ def cmd_help():
 
 def interactive_mode():
     """互動模式主迴圈"""
-    print_header("PCIe 5.0 Base Spec - Chapter 7 查詢工具")
+    print_header(f"{ACTIVE_SPEC.name} Base Spec - Chapter {ACTIVE_SPEC.chapter} 查詢工具")
     print()
-    print("  資料來源: NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf")
-    print("  章節範圍: Chapter 7 - Software Initialization and Configuration")
-    print("  涵蓋頁碼: pp. 673-1000")
+    print(f"  資料來源: {current_pdf_name(ACTIVE_SPEC)}")
+    print(f"  章節範圍: Chapter {ACTIVE_SPEC.chapter} - {ACTIVE_SPEC.chapter_title}")
+    print(f"  涵蓋頁碼: pp. {ACTIVE_SPEC.page_start}-{ACTIVE_SPEC.page_end}")
     print()
     print("  輸入 'help' 查看所有命令，輸入 'quit' 離開")
     print()
