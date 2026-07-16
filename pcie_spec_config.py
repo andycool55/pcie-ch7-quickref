@@ -52,9 +52,9 @@ SPEC_PROFILES: Dict[str, SpecProfile] = {
         revision="6.0",
         chapter="7",
         chapter_title="Software Initialization and Configuration",
-        page_start=859,
-        page_end=1269,
-        page_offset=186,
+        page_start=903,
+        page_end=1316,
+        page_offset=0,
         pdf_candidates=["NCB-PCI_Express_Base_6.0.pdf"],
     ),
 }

@@ -278,6 +278,7 @@ CHAPTER7_TOC = {
 CAPABILITY_ID_MAP = {
     # PCI Capabilities (Offset < 256)
     "01h": {"name": "PCI Power Management", "section": "7.5.2"},
+    "03h": {"name": "Vital Product Data (VPD)", "section": "7.9.19"},
     "05h": {"name": "MSI", "section": "7.7.1"},
     "09h": {"name": "Vendor-Specific", "section": "7.9.4"},
     "0Dh": {"name": "Subsystem ID and Subsystem Vendor ID", "section": "7.9.24"},
@@ -303,6 +304,7 @@ CAPABILITY_ID_MAP = {
     "0016h": {"name": "Dynamic Power Allocation (DPA)", "section": "7.9.12"},
     "0017h": {"name": "TPH Requester", "section": "7.9.13"},
     "0018h": {"name": "Latency Tolerance Reporting (LTR)", "section": "7.8.2"},
+    "0019h": {"name": "Secondary PCI Express", "section": "7.7.3"},
     "001Bh": {"name": "PASID", "section": "7.8.8"},
     "001Ch": {"name": "LN Requester (LNR)", "section": "7.9.14"},
     "001Dh": {"name": "Downstream Port Containment (DPC)", "section": "7.9.15"},

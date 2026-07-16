@@ -8,12 +8,17 @@ PCIe Ch.7 Query Tool  — GUI (Python 3.14 safe, composition pattern)
 import tkinter as tk
 from tkinter import ttk
 import sys, os, subprocess
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pcie_ch7_tool import (
-    CHAPTER7_TOC, CAPABILITY_ID_MAP, REGISTER_ATTRIBUTES,
-    REGISTER_DB, search_toc, search_keywords, fuzzy_search,
+    CHAPTER7_TOC as CHAPTER7_TOC_5,
+    CAPABILITY_ID_MAP as CAPABILITY_ID_MAP_5,
+    REGISTER_ATTRIBUTES,
+    REGISTER_DB as REGISTER_DB_5,
 )
+from pcie_ch7_toc_6 import CHAPTER7_TOC_6
+from pcie_ch7_content_6 import CAPABILITY_ID_MAP_6, REGISTER_DB_6_OUTLINE
 from pcie_spec_config import (
     get_profile,
     list_profiles,
@@ -53,6 +58,28 @@ ATTR_CLR = {
     "RsvdZ":  GRAY,
 }
 
+CHAPTER7_TOC = CHAPTER7_TOC_5
+CAPABILITY_ID_MAP = CAPABILITY_ID_MAP_5
+REGISTER_DB = REGISTER_DB_5
+
+
+def toc_for_profile(profile_key):
+    if profile_key == "pcie6":
+        return CHAPTER7_TOC_6
+    return CHAPTER7_TOC_5
+
+
+def cap_map_for_profile(profile_key):
+    if profile_key == "pcie6":
+        return CAPABILITY_ID_MAP_6
+    return CAPABILITY_ID_MAP_5
+
+
+def register_db_for_profile(profile_key):
+    if profile_key == "pcie6":
+        return REGISTER_DB_6_OUTLINE
+    return REGISTER_DB_5
+
 def attr_color(attr_str):
     a = attr_str.split("/")[0].strip()
     return ATTR_CLR.get(a, DIM)
@@ -61,6 +88,7 @@ def attr_color(attr_str):
 # ═════════════════════════════════════════════════════════════════════════════
 def run():
     print("DEBUG: Starting run() function")
+    global CHAPTER7_TOC, CAPABILITY_ID_MAP, REGISTER_DB
     profiles = list_profiles()
     profile_map = {p.label: p for p in profiles}
     _spec = [get_profile(None)]
@@ -260,12 +288,19 @@ def run():
         canvas.itemconfigure(_canvas_window, width=e.width)
     canvas.bind("<Configure>", _on_canvas_configure)
 
-    # set initial sidebar width (~280px)
+    # set initial sidebar width (expanded by default; no manual drag needed)
+    _sidebar_default_w = 420
+
+    def _ensure_sidebar_expanded(_tries=4):
+        try:
+            main.sashpos(0, _sidebar_default_w)
+        except tk.TclError:
+            return
+        if _tries > 0:
+            root.after(80, lambda: _ensure_sidebar_expanded(_tries - 1))
+
     root.update_idletasks()
-    try:
-        main.sashpos(0, 280)
-    except tk.TclError:
-        pass
+    _ensure_sidebar_expanded()
 
     # ── status bar ─────────────────────────────────────────────────────────────
     status = tk.Frame(root, bg=SIDEBAR, height=24)
@@ -324,6 +359,100 @@ def run():
         prefix = sec + "."
         return [k for k in CHAPTER7_TOC
                 if k.startswith(prefix) and len(k.split(".")) == depth]
+
+    def _norm_text(s):
+        return "".join(ch for ch in s.lower() if ch.isalnum())
+
+    def _cap_id_aliases(cap_id):
+        # Examples for 0019h:
+        #   0019h, 0019, 0x0019, 19h, 19
+        c = cap_id.lower().strip()
+        if not c.endswith("h"):
+            return {c}
+        hex_part = c[:-1]
+        trimmed = hex_part.lstrip("0") or "0"
+        return {
+            c,
+            hex_part,
+            f"0x{hex_part}",
+            f"{trimmed}h",
+            trimmed,
+            f"0x{trimmed}",
+        }
+
+    def _fuzzy_search_dynamic(query):
+        q = query.strip().lower()
+        if not q:
+            return {"sections": [], "caps": [], "registers": []}
+
+        tokens = [t for t in q.replace("-", " ").replace("_", " ").split() if len(t) >= 2]
+        if not tokens:
+            tokens = [q]
+        q_norm = _norm_text(q)
+
+        def _tok_score(text):
+            t = text.lower()
+            return sum(1 for tok in tokens if tok in t)
+
+        sec_results = []
+        for sec_id, info in CHAPTER7_TOC.items():
+            title = info["title"]
+            score = 0
+            if q in sec_id.lower():
+                score += 8
+            if q in title.lower():
+                score += 10
+            score += _tok_score(sec_id) + _tok_score(title) * 3
+            if score > 0:
+                sec_results.append((sec_id, info, score))
+        sec_results.sort(key=lambda x: (-x[2], [int(p) for p in x[0].split(".")]))
+
+        cap_results = []
+        for cap_id, info in CAPABILITY_ID_MAP.items():
+            name = info["name"]
+            section = info.get("section", "")
+            aliases = _cap_id_aliases(cap_id)
+            score = 0
+            if q in cap_id.lower() or q in section.lower():
+                score += 12
+            if q in aliases:
+                score += 20
+            if q in name.lower():
+                score += 10
+            score += _tok_score(cap_id) + _tok_score(name) * 3 + _tok_score(section) * 2
+
+            alias_blob = " ".join(sorted(aliases))
+            score += _tok_score(alias_blob) * 4
+
+            # Tolerate minor typos like "capbility" and spacing/punctuation variance.
+            name_norm = _norm_text(name)
+            if q_norm and q_norm in name_norm:
+                score += 6
+
+            if score > 0:
+                cap_results.append((cap_id, info, score))
+        cap_results.sort(key=lambda x: (-x[2], x[0]))
+
+        reg_results = []
+        for reg_name, data in REGISTER_DB.items():
+            sec = data.get("section", "")
+            title = reg_name.replace("_", " ")
+            offset = data.get("offset", "")
+            score = 0
+            if q in reg_name.lower() or q in title.lower():
+                score += 10
+            if q in offset.lower():
+                score += 6
+            score += _tok_score(reg_name) * 3 + _tok_score(title) * 3 + _tok_score(offset)
+            if score > 0:
+                reg_results.append((reg_name, data, score))
+        reg_results.sort(key=lambda x: (-x[2], x[0]))
+
+        return {
+            "sections": sec_results,
+            "caps": cap_results,
+            "registers": reg_results,
+        }
         
     def section_label(parent, text, fg=ACCENT, font=("Segoe UI",11,"bold"), pady=(12,4)):
         tk.Label(parent, text=text, bg=BG, fg=fg,
@@ -497,11 +626,44 @@ def run():
         if not os.path.exists(pdf_path):
             set_status(f"PDF not found: {pdf_path}"); return
         try:
-            sp = r"C:\Program Files\SumatraPDF\SumatraPDF.exe"
-            if os.path.exists(sp):
-                subprocess.Popen([sp, "-page", str(page), pdf_path])
-            else:
-                os.startfile(pdf_path)
+            # 1) SumatraPDF (best page-jump behavior)
+            sumatra_candidates = [
+                r"C:\Program Files\SumatraPDF\SumatraPDF.exe",
+                r"C:\Program Files (x86)\SumatraPDF\SumatraPDF.exe",
+                str(Path.home() / "AppData" / "Local" / "SumatraPDF" / "SumatraPDF.exe"),
+            ]
+            for sp in sumatra_candidates:
+                if os.path.exists(sp):
+                    subprocess.Popen([sp, "-reuse-instance", "-page", str(page), pdf_path])
+                    return
+
+            # 2) Adobe Reader / Acrobat
+            adobe_candidates = [
+                r"C:\Program Files\Adobe\Acrobat DC\Acrobat\Acrobat.exe",
+                r"C:\Program Files\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
+                r"C:\Program Files (x86)\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
+            ]
+            for app in adobe_candidates:
+                if os.path.exists(app):
+                    subprocess.Popen([app, "/A", f"page={page}", pdf_path])
+                    return
+
+            # 3) Browser fallback with #page=<n> (works in Edge/Chrome)
+            pdf_uri = Path(pdf_path).resolve().as_uri() + f"#page={page}"
+            browser_candidates = [
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            ]
+            for app in browser_candidates:
+                if os.path.exists(app):
+                    subprocess.Popen([app, pdf_uri])
+                    return
+
+            # 4) Last fallback: OS default opener (may open at page 1)
+            os.startfile(pdf_path)
+            set_status("Opened with default PDF app (page jump not guaranteed)")
         except Exception as ex:
             set_status(f"Cannot open: {ex}")
 
@@ -811,15 +973,16 @@ def run():
             frame.columnconfigure(c, weight=1)
 
         # Helper to create a label that automatically binds the three mouse events
-        def _make_label(parent_w, text, bg, fg, font_, anchor="w", wrap=0, pady=(0,0)):
+        def _make_label(parent_w, text, bg, fg, font_, anchor="w", wrap=0, pack_pady=(0, 0)):
             label = tk.Label(parent_w, text=text, bg=bg, fg=fg, font=font_,
-                         anchor=anchor, padx=6, pady=pady, cursor="hand2")
+                         anchor=anchor, padx=6, pady=0, cursor="hand2")
             if wrap:
                 label.configure(wraplength=wrap)
             # Bind click and hover to the *card* callbacks defined below
             label.bind("<Button-1>", _click)
             label.bind("<Enter>",    _enter)
             label.bind("<Leave>",    _leave)
+            label.pack(fill="x", pady=pack_pady)
             return label
 
         for idx, item in enumerate(items):
@@ -847,20 +1010,20 @@ def run():
 
             # Tag badge (small badge with the ID or offset)
             _make_label(card, f" {item['tag']} ", tag_bg, tag_fg,
-                        ("Consolas", 8, "bold"), pady=(1,1)).pack(fill="x")
+                        ("Consolas", 8, "bold"), pack_pady=(1, 1))
 
             # Main title – bold and a bit larger
             _make_label(card, item["title"], CARD_BG, TEXT,
-                        ("Segoe UI", 10, "bold"), wrap=200, pady=(4,0)).pack(fill="x")
+                        ("Segoe UI", 10, "bold"), wrap=200, pack_pady=(4, 0))
 
             # Optional subtitle – lighter colour and slightly smaller
             if item.get("sub"):
                 _make_label(card, item["sub"], CARD_BG, DIM,
-                            ("Segoe UI", 9), wrap=200, pady=(1,0)).pack(fill="x")
+                            ("Segoe UI", 9), wrap=200, pack_pady=(1, 0))
 
             # Page info – right‑aligned, yellow for visibility
             _make_label(card, item["page"], CARD_BG, YELLOW,
-                        ("Segoe UI", 9, "bold"), anchor="e", pady=(2,4)).pack(fill="x")
+                        ("Segoe UI", 9, "bold"), anchor="e", pack_pady=(2, 4))
 
             # Ensure the whole card responds to click/hover
             card.bind("<Button-1>", _click)
@@ -875,7 +1038,7 @@ def run():
             return
 
         # 模糊搜尋
-        results = fuzzy_search(q)
+        results = _fuzzy_search_dynamic(q)
         sec_hits = results["sections"]   # (sec_id, info, score)
         cap_hits = results["caps"]       # (cap_id, info, score)
         reg_hits = results["registers"]  # (reg_name, data, score)
@@ -1143,11 +1306,19 @@ def run():
             show_welcome(record=False)
 
     def _on_spec_profile_change(_e=None):
+        global CHAPTER7_TOC, CAPABILITY_ID_MAP, REGISTER_DB
         selected = profile_map.get(spec_picker_var.get())
         if not selected or selected.key == spec().key:
             return
         _spec[0] = selected
+        CHAPTER7_TOC = toc_for_profile(selected.key)
+        CAPABILITY_ID_MAP = cap_map_for_profile(selected.key)
+        REGISTER_DB = register_db_for_profile(selected.key)
+        _refresh_toc_cache()
         _refresh_spec_texts()
+        _populate_toc(toc_filter_var.get())
+        _populate_cap(cap_filter_var.get())
+        _populate_reg(reg_filter_var.get())
         _rerender_current_view()
         set_status(f"Switched spec profile: {selected.label}")
 
@@ -1219,42 +1390,56 @@ def run():
     toc_tree.tag_configure("leaf",   foreground=TEXT)
     toc_tree.tag_configure("branch", foreground=ACCENT)
 
-    # ── pre-compute static data (sort order, has-children map) once ──────────
+    # ── TOC cache (rebuild when switching spec profiles) ─────────────────────
+    _toc_cache = {"sorted_secs": [], "sec_has_kid": {}}
+
     def _sec_key(sec):
         return [int(p) if p.isdigit() else p for p in sec.split(".")]
-    _sorted_secs = sorted(CHAPTER7_TOC.keys(), key=_sec_key)
-    _sec_has_kid = {s: False for s in _sorted_secs}
-    for s in _sorted_secs:
-        parts = s.split(".")
-        if len(parts) > 2:
-            parent = ".".join(parts[:-1])
-            if parent in _sec_has_kid:
-                _sec_has_kid[parent] = True
+
+    def _refresh_toc_cache():
+        sorted_secs = sorted(CHAPTER7_TOC.keys(), key=_sec_key)
+        sec_has_kid = {s: False for s in sorted_secs}
+        for s in sorted_secs:
+            parts = s.split(".")
+            if len(parts) > 2:
+                parent = ".".join(parts[:-1])
+                if parent in sec_has_kid:
+                    sec_has_kid[parent] = True
+        _toc_cache["sorted_secs"] = sorted_secs
+        _toc_cache["sec_has_kid"] = sec_has_kid
+
+    _refresh_toc_cache()
 
     def _populate_toc(query=""):
         # Freeze the widget while we mutate — big perf win.
         toc_tree.delete(*toc_tree.get_children(""))
         q = query.strip().lower()
+        sorted_secs = _toc_cache["sorted_secs"]
+        sec_has_kid = _toc_cache["sec_has_kid"]
 
         if not q:
             # fast path: no filter, no matching, just insert everything
-            for sec in _sorted_secs:
-                info = CHAPTER7_TOC[sec]
+            for sec in sorted_secs:
+                info = CHAPTER7_TOC.get(sec)
+                if not info:
+                    continue
                 parts = sec.split(".")
                 parent = ".".join(parts[:-1]) if len(parts) > 2 else ""
                 if parent and not toc_tree.exists(parent):
                     parent = ""
                 toc_tree.insert(parent, "end", iid=sec,
                                 text=f"{sec}   {info['title']}",
-                                tags=("branch" if _sec_has_kid[sec] else "leaf",),
+                                tags=("branch" if sec_has_kid.get(sec) else "leaf",),
                                 open=False)
             return
 
         # Filtered: precompute the set of sections that themselves match,
         # then include all their ancestors so the tree still forms a path.
         self_matches = set()
-        for sec in _sorted_secs:
-            info = CHAPTER7_TOC[sec]
+        for sec in sorted_secs:
+            info = CHAPTER7_TOC.get(sec)
+            if not info:
+                continue
             if q in sec.lower() or q in info["title"].lower():
                 self_matches.add(sec)
 
@@ -1265,27 +1450,39 @@ def run():
             for i in range(2, len(parts)):
                 visible.add(".".join(parts[:i]))
 
-        for sec in _sorted_secs:
+        for sec in sorted_secs:
             if sec not in visible:
                 continue
-            info = CHAPTER7_TOC[sec]
+            info = CHAPTER7_TOC.get(sec)
+            if not info:
+                continue
             parts = sec.split(".")
             parent = ".".join(parts[:-1]) if len(parts) > 2 else ""
             if parent and not toc_tree.exists(parent):
                 parent = ""
             toc_tree.insert(parent, "end", iid=sec,
                             text=f"{sec}   {info['title']}",
-                            tags=("branch" if _sec_has_kid[sec] else "leaf",),
+                            tags=("branch" if sec_has_kid.get(sec) else "leaf",),
                             open=True)
 
     def _populate_cap(query=""):
         cap_tree.delete(*cap_tree.get_children(""))
         q = query.strip().lower()
+        q_norm = _norm_text(q)
         for cid in sorted(CAPABILITY_ID_MAP.keys()):
             info = CAPABILITY_ID_MAP[cid]
             label = f"{cid}   {info['name']}   §{info['section']}"
-            if q and q not in label.lower():
-                continue
+            if q:
+                aliases = _cap_id_aliases(cid)
+                alias_blob = " ".join(sorted(aliases))
+                label_norm = _norm_text(label)
+                if (
+                    q not in label.lower()
+                    and q not in aliases
+                    and q not in alias_blob
+                    and (not q_norm or q_norm not in label_norm)
+                ):
+                    continue
             cap_tree.insert("", "end", iid=cid, text=label)
 
     def _populate_reg(query=""):
@@ -1452,6 +1649,10 @@ def run():
     root.bind_all("<Control-Key-3>", lambda e: (nb.select(tab_reg), "break")[1])
 
     # ── launch ────────────────────────────────────────────────────────────────
+    CHAPTER7_TOC = toc_for_profile(spec().key)
+    CAPABILITY_ID_MAP = cap_map_for_profile(spec().key)
+    REGISTER_DB = register_db_for_profile(spec().key)
+    _refresh_toc_cache()
     _apply_placeholder()
     show_welcome(record=False)
     root.mainloop()
