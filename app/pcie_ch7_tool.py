@@ -21,7 +21,7 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 from typing import List, Dict, Optional
-from pcie_spec_config import (
+from .pcie_spec_config import (
     get_profile,
     current_pdf_name,
     resolve_pdf_path,

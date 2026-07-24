@@ -104,7 +104,7 @@ NCB-PCI_Express_Base_5.0r1.0-2019-05-22.pdf
 本專案已支援用單一設定檔切換規格版本：
 
 - 可直接在 UI 頂部的 profile 下拉選單即時切換規格。
-- 若要新增未來版本，編輯 `pcie_spec_config.py`，在 `SPEC_PROFILES`
+- 若要新增未來版本，編輯 `app/pcie_spec_config.py`，在 `SPEC_PROFILES`
   增加新 profile。
 - 詳細步驟請看 `SPEC_UPGRADE_GUIDE.md`。
 
@@ -129,12 +129,13 @@ python run_gui.py
 
 | 檔案 | 用途 |
 |---|---|
-| `pcie_ch7_tool.py` | 所有資料（TOC、Cap IDs、Registers、bit fields）+ 模糊搜尋函式。純 Python，無外部相依。 |
-| `pcie_ch7_gui.py` | Tkinter GUI，畫面渲染與導航都在這裡。 |
+| `app/` | 非入口程式整合資料夾（GUI、資料、規格設定、MCP wrapper）。 |
+| `app/pcie_ch7_tool.py` | 所有資料（TOC、Cap IDs、Registers、bit fields）+ 模糊搜尋函式。純 Python，無外部相依。 |
+| `app/pcie_ch7_gui.py` | Tkinter GUI，畫面渲染與導航都在這裡。 |
 | `run_gui.py` | 簡單的進入點（`python run_gui.py`）。 |
 | `PCIe_Ch7_Reference.pyw` | Windows 無 console 啟動器（雙擊）。 |
 | `PCIe_ch7_tool.bat` | 舊版 CLI 模式的 batch 啟動器。 |
-| `pcie_ch7_mcp.py` | MCP server 包裝（實驗性質）。 |
+| `app/pcie_ch7_mcp.py` | MCP server 包裝（實驗性質）。 |
 | `DECISIONS.md` | 變更紀錄 + 非顯而易見的 bug 修法 + agent 規則。 |
 | `PROJECT_MAP.md` | 檔案樹、程式碼區段導覽、prompt 範本（英文）。 |
 

@@ -18,11 +18,12 @@
 - **不要重新引入布林值 `_suppress_sel` 標記** - 改用 `_prog_*` 值標記
 
 ### 架構說明
-- `pcie_ch7_tool.py` - 純數據檔案，包含 4 個字典（TOC、能力 ID、寄存器屬性、寄存器資料庫）加上搜尋功能。沒有 Tkinter 匯入。
-- `pcie_ch7_gui.py` - 主 GUI 檔案，包含一個巨大的 `run()` 函數（約 1400 行）包含所有 GUI 邏輯
-- `run_gui.py` - 簡單的進入點（`python run_gui.py`）
+- `run_gui.py` - 主要且唯一的 GUI 入口點（`python run_gui.py`）
 - `PCIe_Ch7_Reference.pyw` - Windows 無 console 啟動器（雙擊）
 - `PCIe_ch7_tool.bat` - 舊版 CLI 模式啟動器
+- `app/` - 非入口程式整合資料夾
+- `app/pcie_ch7_tool.py` - 純數據檔案，包含 4 個字典（TOC、能力 ID、寄存器屬性、寄存器資料庫）加上搜尋功能。沒有 Tkinter 匯入。
+- `app/pcie_ch7_gui.py` - 主 GUI 檔案，包含一個巨大的 `run()` 函數（約 1400 行）包含所有 GUI 邏輯
 
 ### 重要錯誤/修復（來自 DECISIONS.md）
 1. **側邊欄無限 `<<TreeviewSelect>>` 迴圈** - 透過使用 `_prog_*` 值標記代替布林值 `_suppress_sel` 來修復
@@ -44,4 +45,4 @@
 
 ### 測試/驗證
 - 沒有特定測試指令 - 依賴手動 GUI 測試
-- 所有資料處理發生在 `pcie_ch7_tool.py`（純 Python，無相依套件）
+- 所有資料處理發生在 `app/pcie_ch7_tool.py`（純 Python，無相依套件）

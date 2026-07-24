@@ -118,7 +118,7 @@ reader.
 This project now supports version switching via one config file:
 
 - Use the top-bar profile dropdown to switch spec immediately in UI.
-- To add future versions, edit `pcie_spec_config.py` and add a profile in
+- To add future versions, edit `app/pcie_spec_config.py` and add a profile in
   `SPEC_PROFILES`.
 - Full step-by-step: `SPEC_UPGRADE_GUIDE.md`.
 
@@ -143,12 +143,13 @@ Or double-click `PCIe_Ch7_Reference.pyw` on Windows for a no-console launch.
 
 | File | Purpose |
 |---|---|
-| `pcie_ch7_tool.py` | All data (TOC, Cap IDs, Registers, bit fields) + fuzzy search functions. Pure-Python, no deps. |
-| `pcie_ch7_gui.py` | Tkinter GUI. Renders everything and handles navigation. |
+| `app/` | Non-entry application package (GUI, data, spec config, MCP wrapper). |
+| `app/pcie_ch7_tool.py` | All data (TOC, Cap IDs, Registers, bit fields) + fuzzy search functions. Pure-Python, no deps. |
+| `app/pcie_ch7_gui.py` | Tkinter GUI. Renders everything and handles navigation. |
 | `run_gui.py` | Simple entry point (`python run_gui.py`). |
 | `PCIe_Ch7_Reference.pyw` | Windows no-console launcher (double-click). |
 | `PCIe_ch7_tool.bat` | Batch launcher (legacy CLI mode). |
-| `pcie_ch7_mcp.py` | MCP server wrapper (experimental). |
+| `app/pcie_ch7_mcp.py` | MCP server wrapper (experimental). |
 | `DECISIONS.md` | Change log + non-obvious bug fixes + agent rules. |
 | `PROJECT_MAP.md` | File tree, code section map, prompt templates. |
 
@@ -276,12 +277,13 @@ python run_gui.py
 
 | 檔案 | 用途 |
 |---|---|
-| `pcie_ch7_tool.py` | 所有資料（TOC、Cap IDs、Registers、bit fields）+ 模糊搜尋函式。純 Python，無外部相依。 |
-| `pcie_ch7_gui.py` | Tkinter GUI，畫面渲染與導航都在這裡。 |
+| `app/` | 非入口程式整合資料夾（GUI、資料、規格設定、MCP wrapper）。 |
+| `app/pcie_ch7_tool.py` | 所有資料（TOC、Cap IDs、Registers、bit fields）+ 模糊搜尋函式。純 Python，無外部相依。 |
+| `app/pcie_ch7_gui.py` | Tkinter GUI，畫面渲染與導航都在這裡。 |
 | `run_gui.py` | 簡單的進入點（`python run_gui.py`）。 |
 | `PCIe_Ch7_Reference.pyw` | Windows 無 console 啟動器（雙擊）。 |
 | `PCIe_ch7_tool.bat` | 舊版 CLI 模式的 batch 啟動器。 |
-| `pcie_ch7_mcp.py` | MCP server 包裝（實驗性質）。 |
+| `app/pcie_ch7_mcp.py` | MCP server 包裝（實驗性質）。 |
 | `DECISIONS.md` | 變更紀錄 + 非顯而易見的 bug 修法 + agent 規則。 |
 | `PROJECT_MAP.md` | 檔案樹、程式碼區段導覽、prompt 範本。 |
 

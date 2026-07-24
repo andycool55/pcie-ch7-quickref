@@ -10,7 +10,7 @@ This project supports multiple spec profiles and runtime switching from UI.
 
 ## Add a new spec profile (7.0, 8.0...)
 
-1. Open `pcie_spec_config.py`.
+1. Open `app/pcie_spec_config.py`.
 2. Add one entry in `SPEC_PROFILES` with:
    - `key`
    - `name`

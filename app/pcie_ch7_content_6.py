@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 
-from pcie_ch7_toc_6 import CHAPTER7_TOC_6
+from .pcie_ch7_toc_6 import CHAPTER7_TOC_6
 
 
 _OFF_RE = re.compile(r"\(Offset(?:s)?\s+([^)]+)\)")
@@ -26,6 +26,16 @@ def _slug(text: str) -> str:
 
 def build_capability_id_map_6() -> dict:
     base = {
+        # PCI Capabilities (Offset < 256)
+        "01h": ("PCI Power Management", "7.5.2"),
+        "05h": ("MSI", "7.7.1"),
+        "09h": ("Vendor-Specific", "7.9.4"),
+        "0Dh": ("Subsystem ID and Subsystem Vendor ID", "7.9.23"),
+        "10h": ("PCI Express", "7.5.3"),
+        "11h": ("MSI-X", "7.7.2"),
+        "13h": ("Advanced Features", "7.9.21"),
+        "15h": ("Flattening Portal Bridge", "7.8.11"),
+        # Extended Capabilities (Cap ID >= 0001h)
         "03h": ("Vital Product Data (VPD)", "7.9.18"),
         "0001h": ("AER", "7.8.4"),
         "0002h": ("Virtual Channel", "7.9.1"),
@@ -41,7 +51,7 @@ def build_capability_id_map_6() -> dict:
         "000Eh": ("ARI", "7.8.8"),
         "0012h": ("Multicast", "7.9.11"),
         "0014h": ("Enhanced Allocation", "7.8.5"),
-        "0010h": ("SR-IOV", "7.8.16"),
+        "0010h": ("SR-IOV", "7.8.14"),
         "0015h": ("Resizable BAR", "7.8.6"),
         "0016h": ("Dynamic Power Allocation", "7.9.12"),
         "0017h": ("TPH Requester", "7.9.13"),
@@ -52,20 +62,20 @@ def build_capability_id_map_6() -> dict:
         "001Ch": ("LN Requester", "7.9.14"),
         "001Dh": ("Downstream Port Containment", "7.9.14"),
         "001Eh": ("L1 PM Substates", "7.8.3"),
-        "001Fh": ("Precision Time Measurement", "7.8.17"),
+        "001Fh": ("Precision Time Measurement", "7.9.15"),
         "0021h": ("FRS Queueing", "7.8.10"),
         "0022h": ("Readiness Time Reporting", "7.9.16"),
         "0023h": ("Designated Vendor-Specific Extended Capability", "7.9.6"),
         "0025h": ("Data Link Feature", "7.7.4"),
         "0026h": ("Physical Layer 16.0 GT/s", "7.7.5"),
         "0027h": ("Lane Margining at the Receiver", "7.7.10"),
-        "0028h": ("Hierarchy ID", "7.8.15"),
-        "0029h": ("Native PCIe Enclosure Management", "7.8.18"),
+        "0028h": ("Hierarchy ID", "7.9.17"),
+        "0029h": ("Native PCIe Enclosure Management", "7.9.19"),
         "002Ah": ("Physical Layer 32.0 GT/s", "7.7.6"),
-        "002Bh": ("Alternate Protocol", "7.8.19"),
-        "002Ch": ("System Firmware Intermediary", "7.8.20"),
-        "002Dh": ("Shadow Functions", "7.8.21"),
-        "002Eh": ("Data Object Exchange", "7.8.22"),
+        "002Bh": ("Alternate Protocol", "7.9.20"),
+        "002Ch": ("System Firmware Intermediary", "7.9.22"),
+        "002Dh": ("Shadow Functions", "7.9.25"),
+        "002Eh": ("Data Object Exchange", "7.9.24"),
         "002Fh": ("Device 3", "7.7.9"),
         "0030h": ("Physical Layer 64.0 GT/s", "7.7.7"),
         "0031h": ("Flit Logging", "7.7.8"),
@@ -75,6 +85,8 @@ def build_capability_id_map_6() -> dict:
 
     cap_map = {}
     for cap_id, (name, sec) in base.items():
+        # Keep only capabilities that have a concrete Chapter 7 section in the
+        # imported TOC. (Example: SR-IOV moved out of Chapter 7 in PCIe 6.0.)
         if sec in CHAPTER7_TOC_6:
             cap_map[cap_id] = {"name": name, "section": sec}
     return cap_map

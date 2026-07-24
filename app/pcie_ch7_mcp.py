@@ -10,7 +10,7 @@ import io
 import contextlib
 
 # Import the original command implementations
-from pcie_ch7_tool import (
+from .pcie_ch7_tool import (
     cmd_search,
     cmd_section,
     cmd_reg,

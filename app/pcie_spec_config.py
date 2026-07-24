@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SPEC_PDF_ENV = "PCIE_SPEC_PDF"
 
 

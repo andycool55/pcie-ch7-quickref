@@ -7,19 +7,19 @@ PCIe Ch.7 Query Tool  — GUI (Python 3.14 safe, composition pattern)
 
 import tkinter as tk
 from tkinter import ttk
-import sys, os, subprocess
+import os, subprocess
+import re
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pcie_ch7_tool import (
+from .pcie_ch7_tool import (
     CHAPTER7_TOC as CHAPTER7_TOC_5,
     CAPABILITY_ID_MAP as CAPABILITY_ID_MAP_5,
     REGISTER_ATTRIBUTES,
     REGISTER_DB as REGISTER_DB_5,
 )
-from pcie_ch7_toc_6 import CHAPTER7_TOC_6
-from pcie_ch7_content_6 import CAPABILITY_ID_MAP_6, REGISTER_DB_6_OUTLINE
-from pcie_spec_config import (
+from .pcie_ch7_toc_6 import CHAPTER7_TOC_6
+from .pcie_ch7_content_6 import CAPABILITY_ID_MAP_6, REGISTER_DB_6_OUTLINE
+from .pcie_spec_config import (
     get_profile,
     list_profiles,
     current_pdf_name,
@@ -359,6 +359,120 @@ def run():
         prefix = sec + "."
         return [k for k in CHAPTER7_TOC
                 if k.startswith(prefix) and len(k.split(".")) == depth]
+
+    _OFF_HEX_RE = re.compile(r"([0-9A-Fa-f]+)h")
+
+    def _offset_ranges(text):
+        m = re.search(r"\(Offset(?:s)?\s+([^)]+)\)", text)
+        if not m:
+            return []
+        raw = m.group(1).strip()
+        tokenized = re.sub(r"\bto\b", "-", raw, flags=re.IGNORECASE)
+        parts = [p.strip() for p in re.split(r"[\/,]", tokenized) if p.strip()]
+
+        ranges = []
+        for part in parts:
+            vals = [int(h, 16) for h in _OFF_HEX_RE.findall(part)]
+            if not vals:
+                continue
+            if "-" in part and len(vals) >= 2:
+                lo = min(vals[0], vals[1])
+                hi = max(vals[0], vals[1])
+                ranges.append((lo, hi))
+            else:
+                ranges.append((vals[0], vals[0]))
+        return ranges
+
+    def _build_outline_rows(container_sec):
+        rows = []
+        for child in _kids(container_sec):
+            info = CHAPTER7_TOC.get(child)
+            if not info:
+                continue
+            for lo, hi in _offset_ranges(info.get("title", "")):
+                rows.append({
+                    "sec": child,
+                    "title": info["title"],
+                    "page": info.get("page", 0),
+                    "lo": lo,
+                    "hi": hi,
+                })
+        rows.sort(key=lambda r: (r["lo"], r["hi"], r["sec"]))
+        return rows
+
+    def _section_outline_figure(parent, sec):
+        container_sec = sec
+        rows = _build_outline_rows(container_sec)
+        focus_sec = None
+
+        if not rows and len(sec.split(".")) > 2:
+            parent_sec = ".".join(sec.split(".")[:-1])
+            rows = _build_outline_rows(parent_sec)
+            if rows:
+                container_sec = parent_sec
+                focus_sec = sec
+
+        if len(rows) < 2:
+            return
+
+        min_off = min(r["lo"] for r in rows)
+        max_off = max(r["hi"] for r in rows)
+        if max_off - min_off > 0x200:
+            return
+
+        section_label(parent, "Register Layout (Figure-style)", fg=YELLOW,
+                      font=("Segoe UI", 10, "bold"), pady=(10, 2))
+        if container_sec != sec:
+            section_label(parent, f"Derived from parent section §{container_sec}", fg=DIM,
+                          font=("Segoe UI", 8), pady=(0, 3))
+
+        wrap = tk.Frame(parent, bg=PANEL, highlightthickness=1, highlightbackground=BORDER)
+        wrap.pack(fill="x", padx=16, pady=(2, 8))
+
+        axis = tk.Canvas(wrap, bg=PANEL, highlightthickness=0, height=26)
+        axis.pack(fill="x", padx=8, pady=(6, 2))
+        axis.update_idletasks()
+        aw = max(axis.winfo_width(), 760)
+        left_pad = 136
+        right_pad = 14
+        plot_w = max(120, aw - left_pad - right_pad)
+        span = max(1, max_off - min_off)
+
+        def x_for(offset):
+            return left_pad + ((offset - min_off) / span) * plot_w
+
+        axis.create_text(6, 13, text="Offset", fill=DIM, font=("Consolas", 8), anchor="w")
+        for tick in range((min_off // 0x10) * 0x10, ((max_off + 0x0F) // 0x10) * 0x10 + 1, 0x10):
+            tx = x_for(max(min_off, min(max_off, tick)))
+            axis.create_line(tx, 12, tx, 23, fill=BORDER)
+            axis.create_text(tx, 4, text=f"{tick:02X}h", fill=DIM, font=("Consolas", 8), anchor="s")
+
+        body = tk.Frame(wrap, bg=PANEL)
+        body.pack(fill="x", padx=8, pady=(0, 8))
+
+        for i, row in enumerate(rows):
+            rbg = ROW0 if i % 2 == 0 else ROW1
+            line = tk.Canvas(body, bg=rbg, highlightthickness=0, height=28)
+            line.pack(fill="x", pady=1)
+            line.update_idletasks()
+            lw = max(line.winfo_width(), 760)
+            plot_w_line = max(120, lw - left_pad - right_pad)
+
+            def x_line(off):
+                return left_pad + ((off - min_off) / span) * plot_w_line
+
+            off_text = f"{row['lo']:02X}h" if row["lo"] == row["hi"] else f"{row['lo']:02X}h-{row['hi']:02X}h"
+            line.create_text(6, 14, text=off_text, fill=CYAN, font=("Consolas", 8, "bold"), anchor="w")
+
+            x0 = x_line(row["lo"])
+            x1 = x_line(row["hi"] + 4)
+            if x1 < x0 + 44:
+                x1 = x0 + 44
+            fill = "#2a355d" if row["sec"] != focus_sec else "#355f3f"
+            outline = ACCENT if row["sec"] != focus_sec else GREEN
+            line.create_rectangle(x0, 5, x1, 23, fill=fill, outline=outline, width=1)
+            label = f"§{row['sec']}  {row['title']}"
+            line.create_text(x0 + 6, 14, text=label, fill=TEXT, font=("Segoe UI", 8), anchor="w")
 
     def _norm_text(s):
         return "".join(ch for ch in s.lower() if ch.isalnum())
@@ -846,6 +960,8 @@ def run():
                       font=("Segoe UI",14,"bold"), pady=(0,2))
         info_row(content_frame,"Spec page:", str(to_spec_page(info["page"])), value_fg=YELLOW)
         divider(content_frame)
+
+        _section_outline_figure(content_frame, sec)
 
         # child sections as cards
         kids = _kids(sec)
